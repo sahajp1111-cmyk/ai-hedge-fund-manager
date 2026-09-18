@@ -4,6 +4,8 @@
 
 This first milestone is a client-side dashboard prototype using sample data. It does not collect passwords, brokerage credentials, personal access tokens, or execute trades.
 
+The API foundation validates asymmetric OIDC access tokens using the provider's published JWKS. It does not accept passwords, issue its own long-lived tokens, or store tokens in the browser. Authentication is deny-by-default when OIDC configuration is missing or invalid.
+
 ## Mandatory rules for integrations
 
 - Never put secrets in `VITE_*` variables because Vite exposes them to the browser.

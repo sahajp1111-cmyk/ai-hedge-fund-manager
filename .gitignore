@@ -6,6 +6,7 @@ __pycache__/
 # Frontend dependencies and build output
 node_modules/
 dist/
+server-dist/
 *.tsbuildinfo
 
 # C extensions
