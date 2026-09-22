@@ -28,6 +28,7 @@ app.use(cookieParser());
 app.use('/api', rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: 'draft-8', legacyHeaders: false }));
 
 app.get('/api/health', (_request, response) => response.json({ status: 'ok' }));
+app.get('/api/market/status', (_request, response) => response.json({ mode: 'demo', markets: ['USA', 'CANADA', 'INDIA'], refreshTargetMinutes: 30, liveProviderConnected: false, notice: 'Production responses will include provider, source time, ingestion time, and delay class.' }));
 app.get('/api/me', requireAuth, (request, response) => response.json({ subject: request.auth!.subject }));
 app.get('/api/portfolio', requireAuth, requireScope('portfolio:read'), (_request, response) => response.json({
   mode: 'demo',
