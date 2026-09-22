@@ -6,6 +6,9 @@ const schema = z.object({
   ALLOWED_ORIGINS: z.string().default('http://localhost:5173'),
   OIDC_ISSUER: z.string().url(),
   OIDC_AUDIENCE: z.string().min(1),
+  EODHD_API_TOKEN: z.string().min(1).optional(),
+  TWELVE_DATA_API_KEY: z.string().min(1).optional(),
+  UPSTOX_ACCESS_TOKEN: z.string().min(1).optional(),
   TRUST_PROXY: z.enum(['true', 'false']).default('false'),
 });
 

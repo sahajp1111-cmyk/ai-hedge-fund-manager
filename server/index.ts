@@ -7,6 +7,8 @@ import helmet from 'helmet';
 import { z } from 'zod';
 import { requireAuth, requireScope } from './auth.js';
 import { config } from './config.js';
+import { getMarketQuote, providerStatuses } from './providers/index.js';
+import { ProviderError } from './providers/types.js';
 
 const app = express();
 app.disable('x-powered-by');
@@ -28,7 +30,26 @@ app.use(cookieParser());
 app.use('/api', rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: 'draft-8', legacyHeaders: false }));
 
 app.get('/api/health', (_request, response) => response.json({ status: 'ok' }));
-app.get('/api/market/status', (_request, response) => response.json({ mode: 'demo', markets: ['USA', 'CANADA', 'INDIA'], refreshTargetMinutes: 30, liveProviderConnected: false, notice: 'Production responses will include provider, source time, ingestion time, and delay class.' }));
+app.get('/api/market/status', (_request, response) => {
+  const providers = providerStatuses();
+  response.json({
+    mode: providers.some((provider) => provider.configured) ? 'provider-ready' : 'demo',
+    markets: ['USA', 'CANADA', 'INDIA'], refreshTargetMinutes: 30,
+    liveProviderConnected: providers.some((provider) => provider.configured && provider.delayClass === 'LIVE'),
+    providers,
+    notice: 'Every quote identifies its provider, source time, ingestion time, and delay class.',
+  });
+});
+const quoteQuery = z.object({
+  market: z.enum(['USA', 'CANADA', 'INDIA']),
+  symbol: z.string().trim().min(1).max(80).regex(/^[A-Za-z0-9._|:-]+$/),
+});
+app.get('/api/market/quote', async (request, response, next) => {
+  const parsed = quoteQuery.safeParse(request.query);
+  if (!parsed.success) return response.status(400).json({ error: 'invalid_market_or_symbol' });
+  try { return response.json(await getMarketQuote(parsed.data.market, parsed.data.symbol)); }
+  catch (error) { return next(error); }
+});
 app.get('/api/me', requireAuth, (request, response) => response.json({ subject: request.auth!.subject }));
 app.get('/api/portfolio', requireAuth, requireScope('portfolio:read'), (_request, response) => response.json({
   mode: 'demo',
@@ -47,6 +68,7 @@ app.post('/api/research', requireAuth, requireScope('research:write'), (request,
 app.use((_request, response) => response.status(404).json({ error: 'not_found' }));
 const errors: ErrorRequestHandler = (error, _request, response, _next) => {
   console.error({ message: error instanceof Error ? error.message : 'Unknown error' });
+  if (error instanceof ProviderError) return response.status(error.status).json({ error: 'market_data_error', message: error.message });
   response.status(500).json({ error: 'internal_error' });
 };
 app.use(errors);
