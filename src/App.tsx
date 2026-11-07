@@ -14,6 +14,7 @@ import {
 import type { ScanResult, Snapshot } from "../shared/schema";
 import type { Job, Alert } from "../shared/operations";
 import type { Identity } from "../shared/schema";
+import type { MarketQuote } from "../server/providers/types";
 type Security = Identity & { providerSymbol: string };
 type Health = {
   mode: string;
@@ -133,7 +134,7 @@ export default function App() {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        credentials: "omit",
+        credentials: "same-origin",
       });
       const body = await r.json().catch(() => ({}));
       if (!r.ok) throw Error(body.message ?? body.error ?? `HTTP ${r.status}`);
@@ -186,7 +187,7 @@ export default function App() {
     };
   }, []);
   useEffect(() => {
-    if (session === "local-loopback" || token) void refresh();
+    if (session === "local-loopback" || session === "password" || token) void refresh();
   }, [session, token, refresh]);
   useEffect(() => {
     if (!connected) return;
@@ -331,12 +332,21 @@ export default function App() {
             <RefreshCw size={15} />
             {loading ? "Refreshing…" : "Refresh"}
           </button>
-          {token && (
+          {(token || (session === "password" && connected)) && (
             <button
               className="secondary"
-              onClick={() => {
+              onClick={async () => {
+                if (session === "password") {
+                  try { await request("/api/auth/logout", {method: "POST", body: "{}"}); }
+                  catch (e) { setError((e as Error).message); return; }
+                }
                 setToken("");
                 setConnected(false);
+                setHealth(null);
+                setUniverse([]);
+                setSelected(null);
+                setMessage("");
+                setQuery("");
                 setResults([]);
                 setSnapshots([]);
                 setHoldings([]);
@@ -374,31 +384,36 @@ export default function App() {
               </button>
             </div>
           )}
-          {session === "oidc" && !connected && (
+          {(session === "oidc" || session === "password") && !connected && (
             <form
               className="panel login"
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
-                setToken(draftToken);
+                const value = draftToken;
                 setDraftToken("");
+                if (session === "password") {
+                  try {
+                    await request("/api/auth/login", {method: "POST", body: JSON.stringify({password: value})});
+                    await refresh();
+                  } catch (err) { setError((err as Error).message); }
+                } else setToken(value);
               }}
             >
-              <h2>Connect your private workspace</h2>
+              <h2>{session === "password" ? "Sign in to your private dashboard" : "Connect your private workspace"}</h2>
               <p>
-                Use a short-lived access token from your configured identity
-                provider. It stays in memory and is cleared on reload.
+                {session === "password" ? "Enter your personal dashboard passphrase. Access is restricted to the owner." : "Use a short-lived access token from your configured identity provider. It stays in memory and is cleared on reload."}
               </p>
               <input
                 type="password"
-                autoComplete="off"
-                aria-label="Access token"
+                autoComplete={session === "password" ? "current-password" : "off"}
+                aria-label={session === "password" ? "Dashboard passphrase" : "Access token"}
                 value={draftToken}
                 onChange={(e) => setDraftToken(e.target.value)}
               />
-              <button className="primary">Connect</button>
+              <button className="primary">{session === "password" ? "Sign in" : "Connect"}</button>
             </form>
           )}
-          {detail ? (
+          {connected && (detail ? (
             <Detail
               result={detail}
               snapshot={snap}
@@ -511,6 +526,7 @@ export default function App() {
               )}
               {page === "Market radar" && (
                 <>
+                  <QuoteLookup universe={universe} request={request} />
                   <div className="toolbar">
                     <div className="tabs">
                       {["ALL", "USA", "CANADA", "INDIA"].map((m) => (
@@ -845,7 +861,7 @@ export default function App() {
                 </article>
               )}
             </>
-          )}
+          ))}
           <footer>
             Research rules are unvalidated. Source dates and missing evidence
             matter. No automatic trading.
@@ -854,6 +870,32 @@ export default function App() {
       </main>
     </div>
   );
+}
+function QuoteLookup({universe, request}: {universe: Security[]; request: <T>(path: string, init?: RequestInit) => Promise<T>}) {
+  const [key, setKey] = useState(universe[0] ? `${universe[0].market}:${universe[0].symbol}` : "");
+  const [quote, setQuote] = useState<MarketQuote | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  return <article className="panel">
+    <h2>Provider quote check</h2>
+    <p>Fetch an actual provider quote. The source timestamp and delay label determine freshness; this is separate from the hourly research scan.</p>
+    <form className="toolbar" onSubmit={async e => {
+      e.preventDefault(); setBusy(true); setQuote(null); setError("");
+      try {setQuote(await request<MarketQuote>(`/api/market/universe-quote?key=${encodeURIComponent(key)}`));}
+      catch(err) {setError((err as Error).message);} finally {setBusy(false);}
+    }}>
+      <select aria-label="Quote security" value={key} onChange={e => {setKey(e.target.value); setQuote(null); setError("");}}>
+        {universe.map(s => <option key={`${s.market}:${s.symbol}`} value={`${s.market}:${s.symbol}`}>{s.symbol} · {s.market}</option>)}
+      </select>
+      <button className="primary" disabled={busy || !key}>{busy ? "Fetching…" : "Fetch provider quote"}</button>
+    </form>
+    {error && <p role="alert">Data unavailable: {error}</p>}
+    {quote && <div role="status">
+      <h3>{quote.symbol} · {money(quote.price, quote.currency ?? "USD")} · {quote.delayClass}</h3>
+      <p>{quote.provider} · Source: {quote.sourceTimestamp} · Retrieved: {quote.ingestedAt}</p>
+      <p>Quote age at retrieval: {Math.max(0, Math.floor((Date.parse(quote.ingestedAt)-Date.parse(quote.sourceTimestamp))/60000))} minutes. Markets may be closed. This quote does not qualify a company or establish an entry.</p>
+    </div>}
+  </article>;
 }
 function Detail({
   result: r,

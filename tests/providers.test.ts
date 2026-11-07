@@ -116,3 +116,22 @@ test("Quote timestamps and adjusted OHLC are validated; missing time is not repl
     globalThis.fetch = original;
   }
 });
+
+
+test("provider quote check rejects missing, future or wrong-security data", async () => {
+  const {getEodhdQuote} = await import("../server/providers/eodhd.js");
+  const original = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => Response.json({code: "MWA.US", close: 24});
+    await assert.rejects(getEodhdQuote("USA", "MWA.US", "test"), /invalid quote/);
+    globalThis.fetch = async () => Response.json({code: "OTHER.US", close: 24, timestamp: Math.floor(Date.now()/1000)});
+    await assert.rejects(getEodhdQuote("USA", "MWA.US", "test"), /symbol does not match/);
+    globalThis.fetch = async () => Response.json({code: "MWA.US", close: 24, timestamp: Math.floor(Date.now()/1000)+3600});
+    await assert.rejects(getEodhdQuote("USA", "MWA.US", "test"), /in the future/);
+    const timestamp = Math.floor(Date.now()/1000)-900;
+    globalThis.fetch = async () => Response.json({code: "MWA.US", close: 24, timestamp});
+    const quote = await getEodhdQuote("USA", "MWA.US", "test");
+    assert.equal(quote.sourceTimestamp, new Date(timestamp*1000).toISOString());
+    assert.equal(quote.delayClass, "DELAYED");
+  } finally {globalThis.fetch=original;}
+});

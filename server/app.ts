@@ -6,7 +6,9 @@ import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import { z } from "zod";
 import { requireAuth, requireScope } from "./auth.js";
+import { installPasswordAuth } from "./password-auth.js";
 import { config } from "./config.js";
+import { getEodhdQuote } from "./providers/eodhd.js";
 import { getMarketQuote, providerStatuses } from "./providers/index.js";
 import { ProviderError } from "./providers/types.js";
 import { snapshot, bar, market } from "../shared/schema.js";
@@ -52,7 +54,8 @@ export function createApp(store: Store, worker: Worker) {
   // Explicitly reject foreign browser origins even on mutation requests that don't need a preflight.
   app.use("/api", (req, res, next) => {
     const origin = req.header("origin");
-    if (origin && !config.allowedOrigins.has(origin))
+    if ((origin && !config.allowedOrigins.has(origin)) ||
+      (config.OWNER_PASSWORD && !["GET", "HEAD", "OPTIONS"].includes(req.method) && !origin))
       return res.status(403).json({ error: "origin_not_allowed" });
     next();
   });
@@ -71,10 +74,11 @@ export function createApp(store: Store, worker: Worker) {
   );
   app.get("/api/session", (_req, res) =>
     res.json({
-      authentication: config.authEnabled ? "oidc" : "local-loopback",
+      authentication: config.OWNER_PASSWORD ? "password" : config.authEnabled ? "oidc" : "local-loopback",
       researchOnly: true,
     }),
   );
+  installPasswordAuth(app);
   app.use(
     "/api",
     requireAuth,
@@ -114,6 +118,15 @@ export function createApp(store: Store, worker: Worker) {
     } catch (e) {
       next(e);
     }
+  });
+  app.get("/api/market/universe-quote", async (req, res, next) => {
+    const security = universe.find(s => `${s.market}:${s.symbol}` === req.query.key);
+    if (!security) return res.status(400).json({error: "unknown_universe_security"});
+    try {
+      if (!config.EODHD_API_TOKEN) throw new ProviderError(503, "Configure and verify EODHD quote access for this research universe.");
+      const quote = await getEodhdQuote(security.market, security.providerSymbol, config.EODHD_API_TOKEN);
+      res.json({...quote, currency: security.currency});
+    } catch (e) { next(e); }
   });
   app.get("/api/universe", (_req, res) => res.json(universe));
   app.get("/api/scans", (_req, res) =>

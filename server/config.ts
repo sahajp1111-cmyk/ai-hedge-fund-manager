@@ -9,6 +9,7 @@ const schema = z.object({
   ALLOWED_ORIGINS: z.string().default("http://localhost:5173"),
   OIDC_ISSUER: z.preprocess(blank, z.string().url().optional()),
   OIDC_AUDIENCE: optional,
+  OWNER_PASSWORD: z.preprocess(blank, z.string().min(20).max(256).optional()),
   OWNER_SUB: optional,
   OIDC_JWKS_URI: z.preprocess(blank, z.string().url().optional()),
   TELEGRAM_BOT_TOKEN: optional,
@@ -34,6 +35,8 @@ if (!p.success)
   );
 if (Boolean(p.data.TELEGRAM_BOT_TOKEN) !== Boolean(p.data.TELEGRAM_CHAT_ID))
   throw new Error("Configure both Telegram token and chat ID");
+if (p.data.OWNER_PASSWORD && p.data.OIDC_ISSUER)
+  throw new Error("Choose password or OIDC authentication, not both");
 if (Boolean(p.data.OIDC_ISSUER) !== Boolean(p.data.OIDC_AUDIENCE))
   throw new Error("Configure both OIDC issuer and audience");
 if (
@@ -50,15 +53,16 @@ if (
   throw new Error("Production JWKS must use HTTPS");
 if (
   p.data.NODE_ENV === "production" &&
-  (!p.data.OIDC_ISSUER || !p.data.OWNER_SUB)
+  !p.data.OWNER_PASSWORD && (!p.data.OIDC_ISSUER || !p.data.OWNER_SUB)
 )
-  throw new Error("Production requires OIDC authentication and OWNER_SUB");
+  throw new Error("Production requires OWNER_PASSWORD or OIDC authentication with OWNER_SUB");
 export const config = {
   ...p.data,
-  authEnabled: Boolean(p.data.OIDC_ISSUER),
-  host: p.data.OIDC_ISSUER ? "0.0.0.0" : "127.0.0.1",
-  allowedOrigins: new Set(
-    p.data.ALLOWED_ORIGINS.split(",").map((x) => x.trim()),
-  ),
+  authEnabled: Boolean(p.data.OIDC_ISSUER || p.data.OWNER_PASSWORD),
+  host: (p.data.OIDC_ISSUER || p.data.OWNER_PASSWORD) ? "0.0.0.0" : "127.0.0.1",
+  allowedOrigins: new Set([
+    ...p.data.ALLOWED_ORIGINS.split(",").map((x) => x.trim()),
+    ...(process.env.RENDER_EXTERNAL_URL ? [new URL(process.env.RENDER_EXTERNAL_URL).origin] : []),
+  ]),
   trustProxy: p.data.TRUST_PROXY === "true",
 };
