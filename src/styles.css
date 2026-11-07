@@ -577,8 +577,7 @@ li {
     font-size: 22px;
   }
   .eyebrow,
-  .sidebar-note,
-  .connection {
+  .sidebar-note {
     display: none;
   }
   nav {
