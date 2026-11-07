@@ -1,10 +1,10 @@
-export type Market = 'USA' | 'CANADA' | 'INDIA';
-export type DelayClass = 'LIVE' | 'DELAYED' | 'EOD' | 'UNAVAILABLE';
+export type Market = "USA" | "CANADA" | "INDIA";
+export type DelayClass = "LIVE" | "DELAYED" | "EOD" | "UNAVAILABLE";
 
 export type MarketQuote = {
   market: Market;
   symbol: string;
-  provider: 'Twelve Data' | 'EODHD' | 'Upstox';
+  provider: "Twelve Data" | "EODHD" | "Upstox";
   price: number;
   currency?: string;
   changePercent?: number;
@@ -14,7 +14,7 @@ export type MarketQuote = {
 };
 
 export type ProviderStatus = {
-  provider: MarketQuote['provider'];
+  provider: MarketQuote["provider"];
   configured: boolean;
   markets: Market[];
   delayClass: DelayClass;
@@ -22,13 +22,26 @@ export type ProviderStatus = {
 };
 
 export class ProviderError extends Error {
-  constructor(public readonly status: number, message: string) {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
     super(message);
   }
 }
 
-export async function fetchJson(url: URL, init?: RequestInit): Promise<unknown> {
-  const response = await fetch(url, { ...init, signal: AbortSignal.timeout(8_000) });
-  if (!response.ok) throw new ProviderError(502, `Market-data provider returned ${response.status}`);
+export async function fetchJson(
+  url: URL,
+  init?: RequestInit,
+): Promise<unknown> {
+  const response = await fetch(url, {
+    ...init,
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!response.ok)
+    throw new ProviderError(
+      502,
+      `Market-data provider returned ${response.status}`,
+    );
   return response.json();
 }

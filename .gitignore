@@ -222,3 +222,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Private research, positions, credentials and generated reports
+var/
+*.tmp
+calibration-report*.json
+playwright-report/
+test-results/

@@ -1,73 +1,66 @@
-# SignalDesk — AI Hedge Fund Manager
+# SignalDesk — investment research scanner
 
-AI-powered investment research, portfolio analysis, market intelligence, and decision support.
+A single-owner research application for US, Canadian and Indian listed companies. Includes a real persistent queue, rotating scanner, source ledger, manual portfolio, analyst review gates, scenario valuation, technical analysis and retryable notifications. There are no brokerage connections or trade orders.
 
-## Implemented milestones
+## Start locally
 
-- Responsive institutional-style dashboard
-- Portfolio, market radar, AI research, news, and flow navigation
-- Performance, holdings, risk, opportunity, and market-pulse cards
-- Security-first integration rules in `SECURITY.md`
-- Sample data only: no brokerage credentials or real transactions
-- Functional U.S./Canada/India market radar with market-cap filters
-- Boring-business, essential-infrastructure, and underfollowed-company tags
-- Institutional, insider, ETF, FII, and DII flow framework with delay labels
-- Transparent opportunity scoring and hard research-rejection gates
-- News-intelligence and evidence-checklist workspace
-- CI builds the Vite client and secure TypeScript API on Node 20 and 22
-- Budget-aware provider adapters for U.S., Canadian, and Indian quotes
-- Server-side quote cache, input validation, timeouts, and source/freshness metadata
-
-## Market-data plan (maximum C$50/month)
-
-| Market | Provider | Budget role | Expected label |
-| --- | --- | --- | --- |
-| United States | Twelve Data Basic | Free real-time quote allowance | `LIVE` |
-| Canada | EODHD All World Extended | Included in US$29.99/month global plan | `DELAYED` |
-| India | Upstox API | Free live data with an Upstox account | `LIVE` |
-| Global fallback | EODHD | History and intraday for international symbols | `DELAYED` |
-
-Exchange entitlements and provider terms control actual availability. The application never presents delayed or end-of-day data as live.
-
-## Data integrity boundary
-
-The repository is public and contains fictional demonstration companies and holdings only. Live feeds require licensed server-side providers. Every production observation must carry a provider, source timestamp, ingestion timestamp, and one of `LIVE`, `DELAYED`, `FILING`, or `ESTIMATE`.
-
-## Run locally
+Requires Node **22.12+ or 24**. No credentials are needed to start the application or import your own verified data.
 
 ```bash
-npm install
-npm run dev
+npm ci
+cp .env.example .env
+npm test
+npm run build
+npm run start:api
 ```
 
-Run `npm run build` before deployment.
+Open `http://127.0.0.1:8787`. Without OIDC, the server binds only to loopback. An empty workspace is intentional: no fictional companies, returns or holdings are displayed as real data. Without a provider or imported dataset, scans explicitly report `UNAVAILABLE`.
 
-## Secure API
+For frontend development, run `npm run dev:api` and `npm run dev` in separate terminals, and set browser-safe `VITE_API_BASE_URL=http://127.0.0.1:8787` in `.env`.
 
-The `server/` application validates OpenID Connect access tokens against the provider's remote JWKS. Protected routes require both a valid token and the appropriate scope.
+## What is implemented
 
-1. Copy `.env.example` to `.env`.
-2. Configure `OIDC_ISSUER`, `OIDC_AUDIENCE`, and the exact allowed frontend origin.
-3. Run `npm run dev:api` and `npm run dev` in separate terminals.
+- Responsive dashboard connected to saved API results, not static sample candidates.
+- Rotating real-company universe across USA/Canada/India (12 default; configurable up to 50).
+- EODHD daily history and annual fundamentals adapter, cached history and statements.
+- Real research jobs with persisted queued/running/completed/failed states and restart recovery.
+- Typed, validated financial imports with filing dates, full currency units, currency/security checks and current share counts.
+- Normalized-profit/OCF/FCF, ROIC, debt, interest, dilution, growth, liquidity, trend, governance, auditor, legal and valuation gates.
+- Annual P/E (explicitly not TTM), forward P/E, supported forward PEG, actual-interval and 3/5/10-year CAGR where data permits, FCF yield, EV/EBITDA, P/B and scenario returns.
+- Correctly aligned MACD/signal, Wilder RSI/ATR, SMA20/50/200, relative volume and observed support/resistance.
+- Private, source-linked filing/news/institutional/insider/FII-DII evidence ledger. Facts and interpretation stay separate.
+- Manual holdings import with dated values and per-currency P/L; no stale chat-position assumptions.
+- Deduplicated alert outbox, signed HTTPS webhook, optional Telegram mobile delivery, retry/backoff and stable idempotency keys.
+- Point-in-time walk-forward evaluator with leakage checks, non-overlapping outcome cohorts, costs and benchmark comparisons.
+- Single-owner OIDC protection, scope checks, input validation, CORS, rate limits, security headers and private storage.
+- Build/test CI and Docker deployment with persistent storage.
 
-The API includes security headers, strict CORS, request size limits, rate limiting, schema validation, generic error responses, and request IDs. Real credentials remain server-side.
+## Data boundaries
 
-### Configure market data
+This is **research software, not a validated investment strategy**. Passing the configured gates creates a research candidate, never a trade instruction. Ranking weights from Capital Radar v1–v3 remain experimental library functions; production qualification uses explicit gates, not their uncalibrated score.
 
-Add only the keys you have to the server environment. The app remains in demonstration mode when none are configured.
+All scanner observations are dated daily **CLOSE** prices, not continuous real-time feeds. Quote adapters retain conservative delay labels. A configured credential is not a verified connection. A source timestamp is never replaced with the ingestion time when missing.
+
+The EODHD adapter requires history and fundamentals entitlements. The old C$50 plan was a budget aspiration, not a verified entitlement or enforced billing limit. No paid plan is purchased by this code. Set the batch size/cadence to suit your provider allowance.
+
+Provider-reported net income is a provisional normalization proxy. An analyst must inspect original statements, cash conversion, contingent liabilities, working capital, dilution, governance and scenarios before a candidate can qualify. The software cannot independently attest to all legal/accounting facts. No automatic web-news, SEC/SEDAR+/NSE filing crawler, institutional trade inference, brokerage sync or LLM-generated due diligence is claimed; external disclosures can be entered in the evidence ledger and imported review.
+
+Banks, insurers and REITs remain `RESEARCH` pending sector-specific models. Current API access does not provide historical point-in-time data by itself. No backtest results are fabricated.
+
+## Configure data and alerts
+
+Set only server environment variables from `.env.example`. Never put provider secrets in `VITE_*`, the repository, a GitHub issue or chat.
+
+See [data format and sources](docs/DATA.md), [operations and deployment](docs/OPERATIONS.md), and [validation protocol](docs/VALIDATION.md).
+
+Notifications require either your own HTTPS receiving endpoint or your own Telegram bot/chat configuration. Alerts remain in the private in-app outbox when no destination is configured. This application does not send ChatGPT push notifications and is separate from ChatGPT scheduled tasks.
+
+## Verification
 
 ```bash
-EODHD_API_TOKEN=server-only-token
-TWELVE_DATA_API_KEY=server-only-key
-UPSTOX_ACCESS_TOKEN=short-lived-server-only-token
+npm test
+npm run build
+npm run calibrate -- /private/observations.json /private/calibration-report.json
 ```
 
-Test a quote after starting the API:
-
-```bash
-curl "http://localhost:8787/api/market/quote?market=USA&symbol=AAPL"
-curl "http://localhost:8787/api/market/quote?market=CANADA&symbol=SHOP.TO"
-curl "http://localhost:8787/api/market/quote?market=INDIA&symbol=NSE_EQ%7CINE002A01018"
-```
-
-Upstox access tokens are short-lived. A later private deployment milestone will add the authorization callback and encrypted token rotation; never commit or paste access tokens into issues or chat.
+Tests include indicator reference calculations, failed qualification gates, stale/future data, persistent jobs, API import/portfolio/evidence, notification retries/deduplication and look-ahead rejection. Synthetic fixtures are clearly labeled and never loaded on startup.
