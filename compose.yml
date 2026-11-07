@@ -1,0 +1,15 @@
+services:
+  signaldesk:
+    build: .
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /app/var/signaldesk
+    ports:
+      - "127.0.0.1:8787:8787"
+    volumes:
+      - signaldesk-data:/app/var/signaldesk
+    restart: unless-stopped
+    init: true
+volumes:
+  signaldesk-data:
