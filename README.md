@@ -14,7 +14,7 @@ npm run build
 npm run start:api
 ```
 
-Open `http://127.0.0.1:8787`. Without OIDC, the server binds only to loopback. An empty workspace is intentional: no fictional companies, returns or holdings are displayed as real data. Without a provider or imported dataset, scans explicitly report `UNAVAILABLE`.
+Open `http://127.0.0.1:8787`. Without password or OIDC authentication, the server binds only to loopback. An empty workspace is intentional: no fictional companies, returns or holdings are displayed as real data. Without a provider or imported dataset, scans explicitly report `UNAVAILABLE`.
 
 For frontend development, run `npm run dev:api` and `npm run dev` in separate terminals, and set browser-safe `VITE_API_BASE_URL=http://127.0.0.1:8787` in `.env`.
 
@@ -32,7 +32,7 @@ For frontend development, run `npm run dev:api` and `npm run dev` in separate te
 - Manual holdings import with dated values and per-currency P/L; no stale chat-position assumptions.
 - Deduplicated alert outbox, signed HTTPS webhook, optional Telegram mobile delivery, retry/backoff and stable idempotency keys.
 - Point-in-time walk-forward evaluator with leakage checks, non-overlapping outcome cohorts, costs and benchmark comparisons.
-- Single-owner OIDC protection, scope checks, input validation, CORS, rate limits, security headers and private storage.
+- Single-owner passphrase login or OIDC protection, scope checks, input validation, CORS, rate limits, security headers and private storage.
 - Build/test CI and Docker deployment with persistent storage.
 
 ## Data boundaries
@@ -64,3 +64,7 @@ npm run calibrate -- /private/observations.json /private/calibration-report.json
 ```
 
 Tests include indicator reference calculations, failed qualification gates, stale/future data, persistent jobs, API import/portfolio/evidence, notification retries/deduplication and look-ahead rejection. Synthetic fixtures are clearly labeled and never loaded on startup.
+
+## Personal hosted dashboard
+
+See [Render setup](docs/RENDER.md). The personal passphrase login uses an HttpOnly session cookie; no public signup exists. Provider API keys must be configured privately and verified before market data is usable.

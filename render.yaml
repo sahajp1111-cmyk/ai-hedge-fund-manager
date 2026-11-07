@@ -1,0 +1,37 @@
+# Personal, owner-authenticated service. Secrets are entered only in Render.
+services:
+  - type: web
+    name: signaldesk-personal
+    runtime: node
+    region: virginia
+    plan: 0.5c-512mb
+    numInstances: 1
+    autoDeployTrigger: "off"
+    buildCommand: npm ci --include=dev && NODE_ENV=test OWNER_PASSWORD= EODHD_API_TOKEN= TWELVE_DATA_API_KEY= UPSTOX_ACCESS_TOKEN= npm test && npm run build && npm prune --omit=dev
+    startCommand: node server-dist/server/index.js
+    healthCheckPath: /api/health
+    disk:
+      name: signaldesk-private-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: OWNER_PASSWORD
+        sync: false
+      - key: EODHD_API_TOKEN
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: ""
+      - key: DATA_DIR
+        value: /var/data/signaldesk
+      - key: TRUST_PROXY
+        value: "true"
+      - key: SCANNER_ENABLED
+        value: "true"
+      - key: SCAN_INTERVAL_MINUTES
+        value: "60"
+      - key: SCAN_BATCH_SIZE
+        value: "3"

@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
+import { ownerSession } from "./password-auth.js";
 import { config } from "./config.js";
 
 declare global {
@@ -38,6 +39,11 @@ export async function requireAuth(
         scope: "research:read research:write portfolio:read portfolio:write",
       },
     };
+    return next();
+  }
+  if (config.OWNER_PASSWORD) {
+    if (!ownerSession(request)) return response.status(401).json({error: "unauthorized", message: "Sign in to your private workspace."});
+    request.auth = {subject: "personal-owner", claims: {scope: "research:read research:write portfolio:read portfolio:write"}};
     return next();
   }
   const token = bearerToken(request);
